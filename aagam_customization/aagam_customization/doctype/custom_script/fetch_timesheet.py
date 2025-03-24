@@ -72,6 +72,8 @@ def process_timesheet_data(data, date):
             continue
 
         timesheet = frappe.new_doc("Timesheet")
+        timesheet.employee = payroll_enrollment_id
+        timesheet.employee_name = operator_name
         timesheet.custom_operator_id_ = operator_id
         timesheet.custom_operator_name = operator_name
         timesheet.custom_payroll_id = payroll_enrollment_id
@@ -116,9 +118,11 @@ def process_timesheet_data(data, date):
                 total_hours += shift_hour_count
                 total_earnings += earning
                 # ttl += total_pass_count
+                billing_rate = style_data.get("rate", 0)
+                billing_amount = billing_rate * style_data.get("total_pass_count", 0) 
 
                 timesheet.append("time_logs", {
-                    "activity_type": "Planning",
+                    "activity_type": "Earnings",
                     # "hours": shift_hour_count,
                     "custom_style_id": style_id,
                     "custom_style_name": style_name,
@@ -128,15 +132,20 @@ def process_timesheet_data(data, date):
                     "custom_total_pass_count": total_pass_count,
                     "is_billable": 1,
                     # "billing_amount": earning,
-                    "billing_rate": rate,
+                    "billing_rate": billing_rate,
+                    "billing_amount": billing_amount,
+                    "costing_rate" : billing_rate,
+                    "costing_amount":billing_amount,
                     "billing_hours": total_pass_count
                 })
 
         # timesheet.total_hours = total_hours
         timesheet.custom_earnings = total_earnings
+        
         # timesheet.total_billed_hours = ttl
         # Save and submit the timesheet
         timesheet.insert(ignore_permissions=True)
-        timesheet.submit()
+        # timesheet.total_costing_amount = timesheet.total_billable_amount
+        # timesheet.submit()
 
         print(f"Timesheet Created: {operator_name} on {date}")  # Debug
