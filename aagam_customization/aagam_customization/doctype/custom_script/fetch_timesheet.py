@@ -72,6 +72,7 @@ def process_timesheet_data(data, date):
             continue
 
         timesheet = frappe.new_doc("Timesheet")
+        timesheet.company = "SHREE VARDHMAN IMPEX"
         timesheet.employee = payroll_enrollment_id
         timesheet.employee_name = operator_name
         timesheet.custom_operator_id_ = operator_id
@@ -120,15 +121,19 @@ def process_timesheet_data(data, date):
                 # ttl += total_pass_count
                 billing_rate = style_data.get("rate", 0)
                 billing_amount = billing_rate * style_data.get("total_pass_count", 0) 
+                # from_time = datetime.strptime(date, "%Y-%m-%d")
+                # to_time = from_time + timedelta(hours=shift_hour_count)
 
                 timesheet.append("time_logs", {
                     "activity_type": "Earnings",
-                    # "hours": shift_hour_count,
+                    # "from_time": from_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    # "to_time": to_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "hours": billing_rate,
                     "custom_style_id": style_id,
                     "custom_style_name": style_name,
                     "custom_operation": operation,
-                    "from_time": date,
-                    "to_time": date,
+                    # "from_time": date,
+                    # "to_time": date,
                     "custom_total_pass_count": total_pass_count,
                     "is_billable": 1,
                     # "billing_amount": earning,
