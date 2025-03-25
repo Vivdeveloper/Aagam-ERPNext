@@ -76,8 +76,8 @@ def process_timesheet_data(data, date):
         timesheet.employee = payroll_enrollment_id
         timesheet.employee_name = operator_name
         timesheet.custom_operator_id_ = operator_id
-        timesheet.custom_operator_name = operator_name
-        timesheet.custom_payroll_id = payroll_enrollment_id
+        # timesheet.custom_operator_name = operator_name
+        # timesheet.custom_payroll_id = payroll_enrollment_id
         timesheet.start_date = date
         timesheet.end_date = date
         timesheet.total_hours = 0
