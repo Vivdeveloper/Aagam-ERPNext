@@ -19,7 +19,7 @@ def fetch_timesheets(from_date, to_date):
 
     # API URL
     url = f"{STITCH_BASE_URL}/api/integration/operator-tracking-hourly-report"
-
+    url2 = f"{STITCH_BASE_URL}/api/integration/operator-tracking-summary-report"
     # Headers
     headers = {
         "STITCH-KEY": STITCH_API_SECRET_KEY,
@@ -36,10 +36,17 @@ def fetch_timesheets(from_date, to_date):
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()  # Raise an error for HTTP failures (4xx, 5xx)
             data = response.json()
-
+            # print("############")
+            # print(data)
+            response2 = requests.get(url2, headers=headers, params=params)
+            response2.raise_for_status()
+            data2 = response2.json()
+            # print("############")
+            # print(data2)
             # Debugging: Log API Response
             # frappe.log_error(f"API Response for {formatted_date}: {data}", "Timesheet API Debug")
             process_timesheet_data(data["data"], formatted_date)
+            process_timesheet_data_for_summary(data2["data"], formatted_date)
             # if data.get("status") == "success" and data.get("data"):
             #     print("######################################")
                 # process_timesheet_data(data["data"], formatted_date)
@@ -73,6 +80,7 @@ def process_timesheet_data(data, date):
 
         timesheet = frappe.new_doc("Timesheet")
         timesheet.company = "SHREE VARDHMAN IMPEX"
+        timesheet.custom_source = "Operator Tracking Hourly Report"
         timesheet.employee = payroll_enrollment_id
         timesheet.employee_name = operator_name
         timesheet.custom_operator_id_ = operator_id
@@ -132,8 +140,8 @@ def process_timesheet_data(data, date):
                     "custom_style_id": style_id,
                     "custom_style_name": style_name,
                     "custom_operation": operation,
-                    # "from_time": date,
-                    # "to_time": date,
+                    "from_time": date,
+                    "to_time": date,
                     "custom_total_pass_count": total_pass_count,
                     "is_billable": 1,
                     # "billing_amount": earning,
@@ -152,5 +160,124 @@ def process_timesheet_data(data, date):
         timesheet.insert(ignore_permissions=True)
         # timesheet.total_costing_amount = timesheet.total_billable_amount
         # timesheet.submit()
+
+        print(f"Timesheet Created: {operator_name} on {date}")  # Debug
+
+
+def process_timesheet_data_for_summary(data, date):
+    # print("Processing Timesheet Data...")  # Debug
+    for operator_id, operator_data in data.items():
+        # print(f"Operator ID: {operator_id}, Data: {operator_data}")  # Debug
+
+        if not operator_data:
+            print("#####")
+            continue
+
+        operator_name = operator_data.get("name")
+        payroll_enrollment_id = operator_data.get("payroll_enrollment_id")
+
+        
+        existing_timesheet = frappe.db.exists(
+            "Timesheet",
+            {"custom_operator_id_": operator_id, "start_date": date}
+        )
+
+        if existing_timesheet:
+            print(f"Skipping duplicate timesheet for {operator_name} on {date}")  # Debug
+            continue
+
+        timesheet = frappe.new_doc("Timesheet")
+        timesheet.company = "SHREE VARDHMAN IMPEX"
+        timesheet.custom_source = "Operator Tracking Summary Report"
+        timesheet.employee = payroll_enrollment_id
+        timesheet.employee_name = operator_name
+        timesheet.custom_operator_id_ = operator_id
+        timesheet.start_date = date
+        timesheet.end_date = date
+        timesheet.total_hours = 0
+        timesheet.custom_earnings = 0
+
+        total_hours = 0
+        total_earnings = 0
+
+        for style in operator_data.get("styles", []):
+            # print(f"Processing Style: {style}")  # Debug
+            style_name = style.get("style_name")
+            style_id = style.get("style_id")
+
+            for style_data in style.get("style_data", []):
+                # print(f"Processing Style Data: {style_data}")  # Debug
+
+                # Validate and convert date format
+                style_data_date = style_data.get("date")
+                # if isinstance(style_data_date, str):
+                #     try:
+                #         print("#############", style_data_date, date)
+                #         parsed_date = datetime.strptime(style_data_date, "%d-%m-%Y")
+                #         style_data_date = parsed_date.strftime("%Y-%m-%d")
+                #         print("#############", style_data_date, date)
+                #     except ValueError as e:
+                #         print(f"ValueError: {e} | style_data_date: {style_data_date}")
+                #         frappe.log_error(f"Invalid date format: {style_data_date} - Error: {str(e)}", "Timesheet API")
+                #         continue
+
+                # if isinstance(style_data_date, str):
+                #     try:
+                #         print("#############",style_data_date,date)
+                #         style_data_date = datetime.strptime(style_data_date, "%d-%m-%Y").strftime("%Y-%m-%d")
+                #         print("#############",style_data_date,date)
+                #     except ValueError:
+                #         frappe.log_error(f"Invalid date format: {style_data_date}", "Timesheet API")
+                #         continue
+                # print(style_data_date,date)
+                if style_data_date != date:
+                    print(f"Skipping style data: {style_data_date} != {date}")  # Debug
+                    continue
+
+                # Extract fields
+                operation = style_data.get("operation_name")
+                total_production = style_data.get("total_production", 0)
+                earning = style_data.get("earning", 0)
+                rate = style_data.get("rate", 0)
+                shift_hour_count = style_data.get("shift_hour_count", 0)
+
+                print(f"Adding Log: {shift_hour_count} hrs, {style_name}, {operation}, {earning}")  # Debug
+
+                total_hours += shift_hour_count
+                total_earnings += earning
+                # ttl += total_pass_count
+                billing_rate = style_data.get("rate", 0)
+                billing_amount = billing_rate * style_data.get("total_production", 0) 
+                # from_time = datetime.strptime(date, "%Y-%m-%d")
+                # to_time = from_time + timedelta(hours=shift_hour_count)
+
+                timesheet.append("time_logs", {
+                    "activity_type": "Earnings",
+                    # "from_time": from_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    # "to_time": to_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "hours": billing_rate,
+                    "custom_style_id": style_id,
+                    "custom_style_name": style_name,
+                    "custom_operation": operation,
+                    "from_time": date,
+                    "to_time": date,
+                    "custom_total_pass_count": total_production,
+                    "is_billable": 1,
+                    # "billing_amount": earning,
+                    "billing_rate": billing_rate,
+                    "billing_amount": billing_amount,
+                    "costing_rate" : billing_rate,
+                    "costing_amount":billing_amount,
+                    "billing_hours": total_production
+                })
+
+        # timesheet.total_hours = total_hours
+        timesheet.custom_earnings = total_earnings
+        
+        # timesheet.total_billed_hours = ttl
+        # Save and submit the timesheet
+        timesheet.insert(ignore_permissions=True)
+        # # timesheet.total_costing_amount = timesheet.total_billable_amount
+        # # timesheet.submit()
 
         print(f"Timesheet Created: {operator_name} on {date}")  # Debug
