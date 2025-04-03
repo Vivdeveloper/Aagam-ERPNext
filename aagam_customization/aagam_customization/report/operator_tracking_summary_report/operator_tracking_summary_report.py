@@ -16,7 +16,7 @@ def execute(filters=None):
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
 
-    url = f"{STITCH_BASE_URL}/api/integration/operator-tracking-hourly-report"
+    url = f"{STITCH_BASE_URL}/api/integration/operator-tracking-summary-report"
 
     headers = {
         "STITCH-KEY": STITCH_API_SECRET_KEY,
@@ -28,13 +28,14 @@ def execute(filters=None):
         {"fieldname": "payroll_enrollment_id", "label": "Payroll ID", "fieldtype": "Data", "width": 120},
         {"fieldname": "operator_name", "label": "Operator Name", "fieldtype": "Data", "width": 150},
         {"fieldname": "name", "label": "Name", "fieldtype": "Data", "width": 150},
-        {"fieldname": "style_name", "label": "Style Name", "fieldtype": "Data", "width": 150},
         {"fieldname": "style_id", "label": "Style ID", "fieldtype": "Data", "width": 100},
+        {"fieldname": "style_name", "label": "Style Name", "fieldtype": "Data", "width": 150},
         {"fieldname": "date", "label": "Date", "fieldtype": "Date", "width": 120},
         {"fieldname": "operation", "label": "Operation", "fieldtype": "Data", "width": 150},
-        {"fieldname": "total_pass_count", "label": "Total Pass Count", "fieldtype": "Int", "width": 120},
-        {"fieldname": "earning", "label": "Earning", "fieldtype": "Currency", "width": 120},
         {"fieldname": "rate", "label": "Rate", "fieldtype": "Currency", "width": 100},
+        {"fieldname": "total_pass_count", "label": "Total Production", "fieldtype": "Int", "width": 120},
+        {"fieldname": "earning", "label": "Earning", "fieldtype": "Currency", "width": 120},
+        
     ]
 
     data_rows = []
@@ -82,8 +83,8 @@ def execute(filters=None):
                             "style_name": style.get("style_name"),
                             "style_id": style.get("style_id"),
                             "date": date_str,
-                            "operation": style_data.get("operation"),
-                            "total_pass_count": style_data.get("total_pass_count"),
+                            "operation": style_data.get("operation_name"),
+                            "total_pass_count": style_data.get("total_production"),
                             "earning": style_data.get("earning"),
                             "rate": style_data.get("rate"),
                         }
@@ -126,8 +127,8 @@ def execute(filters=None):
                             "style_name": style.get("style_name"),
                             "style_id": style.get("style_id"),
                             "date": date_str,
-                            "operation": style_data.get("operation"),
-                            "total_pass_count": style_data.get("total_pass_count"),
+                            "operation": style_data.get("operation_name"),
+                            "total_pass_count": style_data.get("total_production"),
                             "earning": style_data.get("earning"),
                             "rate": style_data.get("rate"),
                         }
