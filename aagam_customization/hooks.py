@@ -247,6 +247,6 @@ doctype_list_js = {"Timesheet" : "public/js/timesheet.js"}
 
 
 
-override_doctype_class = {
-    "Job Card": "aagam_customization.aagam_customization.doctype.custom_script.new_code.CustomJobCard"
-}
+# override_doctype_class = {
+#     "Job Card": "aagam_customization.aagam_customization.doctype.custom_script.new_code.CustomJobCard"
+# }

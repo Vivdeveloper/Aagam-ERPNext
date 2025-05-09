@@ -14,7 +14,7 @@ from erpnext.manufacturing.doctype.job_card import job_card
 	# @frappe.whitelist()
 class CustomJobCard(JobCard):
 	def validate_job_card(self):
-		print("######################################")
+		# print("######################################")
 		# if self.track_semi_finished_goods:
 		# 	return
 
