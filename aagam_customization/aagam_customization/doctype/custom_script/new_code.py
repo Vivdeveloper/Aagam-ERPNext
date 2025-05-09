@@ -15,8 +15,8 @@ from erpnext.manufacturing.doctype.job_card import job_card
 class CustomJobCard(JobCard):
 	def validate_job_card(self):
 		print("######################################")
-		# if self.track_semi_finished_goods:
-		# 	return
+		if self.track_semi_finished_goods:
+			return
 
 		if self.work_order and frappe.get_cached_value("Work Order", self.work_order, "status") == "Stopped":
 			frappe.throw(
