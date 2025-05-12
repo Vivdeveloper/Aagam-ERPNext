@@ -33,14 +33,14 @@ class CustomJobCard(JobCard):
 		# 				_("Row #{0}: From Time and To Time fields are required").format(row.idx),
 		# 			)
 
-		precision = self.precision("total_completed_qty")
-		total_completed_qty = flt(
-			flt(self.total_completed_qty, precision) + flt(self.process_loss_qty, precision)
-		)
+		# precision = self.precision("total_completed_qty")
+		# total_completed_qty = flt(
+		# 	flt(self.total_completed_qty, precision) + flt(self.process_loss_qty, precision)
+		# )
 
-		if self.for_quantity and flt(total_completed_qty, precision) != flt(self.for_quantity, precision):
-			total_completed_qty_label = bold(_("Total Completed Qty"))
-			qty_to_manufacture = bold(_("Qty to Manufacture"))
+		# if self.for_quantity and flt(total_completed_qty, precision) != flt(self.for_quantity, precision):
+		# 	total_completed_qty_label = bold(_("Total Completed Qty"))
+		# 	qty_to_manufacture = bold(_("Qty to Manufacture"))
 
 			# frappe.throw(
 			# 		_("The {0} ({1}) must be equal to {2} ({3})").format(
