@@ -11,7 +11,7 @@ def execute(filters=None):
 
     fromdate = filters.get("fromdate")
     todate = filters.get("todate")
-    group_by_employee = filters.get("group_by_employee", False)  # Check if the group_by_employee is ticked
+    group_by_employee = filters.get("group_by_employee", False)
 
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
@@ -38,8 +38,10 @@ def execute(filters=None):
     ]
 
     data_rows = []
-    current_date = fromdate_obj
 
+    employee_map = {}  # group rows per employee
+
+    current_date = fromdate_obj
     while current_date <= todate_obj:
         date_str = current_date.strftime("%Y-%m-%d")
         params = {"date": date_str}
@@ -57,83 +59,64 @@ def execute(filters=None):
 
         operators = data.get("data", {})
 
-        if group_by_employee:
-            last_employee = None
-            employee_total = None
+        for operator_id, operator_info in operators.items():
+            employee_key = operator_id
 
-            for operator_id, operator_info in operators.items():
-                current_employee = (operator_id, operator_info.get("payroll_enrollment_id"), 
-                                    operator_info.get("operator_name"), operator_info.get("name"))
+            if employee_key not in employee_map:
+                employee_map[employee_key] = {
+                    "info": operator_info,
+                    "rows": [],
+                    "total_pass_count": 0,
+                    "total_earning": 0,
+                    "total_rate": 0
+                }
 
-                # If it's a new employee, add the total row for the previous one
-                if last_employee and last_employee != current_employee and employee_total:
-                    data_rows.append(employee_total)
-                    employee_total = None  # Reset for the new employee
+            for style in operator_info.get("styles", []):
+                for style_data in style.get("style_data", []):
+                    row = {
+                        "operator_id": operator_id,
+                        "payroll_enrollment_id": operator_info.get("payroll_enrollment_id"),
+                        "operator_name": operator_info.get("operator_name"),
+                        "name": operator_info.get("name"),
+                        "style_name": style.get("style_name"),
+                        "style_id": style.get("style_id"),
+                        "date": date_str,
+                        "operation": style_data.get("operation"),
+                        "total_pass_count": style_data.get("total_pass_count"),
+                        "earning": style_data.get("earning"),
+                        "rate": style_data.get("rate"),
+                    }
 
-                last_employee = current_employee
+                    employee_map[employee_key]["rows"].append(row)
 
-                for style in operator_info.get("styles", []):
-                    for style_data in style.get("style_data", []):
-                        row = {
-                            "operator_id": operator_id,
-                            "payroll_enrollment_id": operator_info.get("payroll_enrollment_id"),
-                            "operator_name": operator_info.get("operator_name"),
-                            "name": operator_info.get("name"),
-                            "style_name": style.get("style_name"),
-                            "style_id": style.get("style_id"),
-                            "date": date_str,
-                            "operation": style_data.get("operation"),
-                            "total_pass_count": style_data.get("total_pass_count"),
-                            "earning": style_data.get("earning"),
-                            "rate": style_data.get("rate"),
-                        }
-
-                        data_rows.append(row)
-
-                        # Initialize total row if not set
-                        if not employee_total:
-                            employee_total = {
-                                "operator_id": f"<b>{operator_id}</b>",
-                                "payroll_enrollment_id": f"<b>{operator_info.get('payroll_enrollment_id')}</b>",
-                                "operator_name": f"<b>{operator_info.get('operator_name')}</b>",
-                                "name": f"<b>{operator_info.get('name')}</b>",
-                                "style_name": "<b>TOTAL</b>",
-                                "style_id": "-",
-                                "date": "-",
-                                "operation": "<b>TOTAL</b>",
-                                "total_pass_count": 0,
-                                "earning": 0,
-                                "rate": 0,
-                            }
-
-                        # Accumulate totals
-                        employee_total["total_pass_count"] += row["total_pass_count"]
-                        employee_total["earning"] += row["earning"]
-                        employee_total["rate"] += row["rate"]
-
-            # Insert the last employee's total row
-            if employee_total:
-                data_rows.append(employee_total)
-        else:
-            for operator_id, operator_info in operators.items():
-                for style in operator_info.get("styles", []):
-                    for style_data in style.get("style_data", []):
-                        row = {
-                            "operator_id": operator_id,
-                            "payroll_enrollment_id": operator_info.get("payroll_enrollment_id"),
-                            "operator_name": operator_info.get("operator_name"),
-                            "name": operator_info.get("name"),
-                            "style_name": style.get("style_name"),
-                            "style_id": style.get("style_id"),
-                            "date": date_str,
-                            "operation": style_data.get("operation"),
-                            "total_pass_count": style_data.get("total_pass_count"),
-                            "earning": style_data.get("earning"),
-                            "rate": style_data.get("rate"),
-                        }
-
-                        data_rows.append(row)
+                    # Accumulate totals
+                    employee_map[employee_key]["total_pass_count"] += row["total_pass_count"]
+                    employee_map[employee_key]["total_earning"] += row["earning"]
+                    employee_map[employee_key]["total_rate"] += row["rate"]
 
         current_date += timedelta(days=1)
+
+    # After gathering all rows, insert per-employee rows + total
+    for emp_id, emp_data in employee_map.items():
+        # Add individual rows
+        data_rows.extend(emp_data["rows"])
+
+        if group_by_employee:
+            # Add total row after each employee's rows
+            operator_info = emp_data["info"]
+            total_row = {
+                "operator_id": f"<b>{emp_id}</b>",
+                "payroll_enrollment_id": f"<b>{operator_info.get('payroll_enrollment_id')}</b>",
+                "operator_name": f"<b>{operator_info.get('operator_name')}</b>",
+                "name": f"<b>{operator_info.get('name')}</b>",
+                "style_name": "<b>TOTAL</b>",
+                "style_id": "-",
+                "date": "-",
+                "operation": "<b>TOTAL</b>",
+                "total_pass_count": emp_data["total_pass_count"],
+                "earning": emp_data["total_earning"],
+                "rate": emp_data["total_rate"],
+            }
+            data_rows.append(total_row)
 
     return columns, data_rows
