@@ -23,7 +23,7 @@ def execute(filters=None):
         "Content-Type": "application/json"
     }
 
-    # Always include date column
+   
     columns = [
         {"fieldname": "operator_id", "label": "Operator ID", "fieldtype": "Data", "width": 100},
         {"fieldname": "payroll_enrollment_id", "label": "Payroll ID", "fieldtype": "Data", "width": 120},
