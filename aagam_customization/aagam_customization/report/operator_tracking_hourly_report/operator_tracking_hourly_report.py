@@ -11,6 +11,7 @@ def execute(filters=None):
 
     fromdate = filters.get("fromdate")
     todate = filters.get("todate")
+    group_by_employee = filters.get("group_by_employee", False)
 
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
@@ -23,8 +24,12 @@ def execute(filters=None):
     }
 
     columns = [
+        {"fieldname": "operator_id", "label": "Operator ID", "fieldtype": "Data", "width": 100},
         {"fieldname": "payroll_enrollment_id", "label": "Payroll ID", "fieldtype": "Data", "width": 120},
         {"fieldname": "operator_name", "label": "Operator Name", "fieldtype": "Data", "width": 150},
+        {"fieldname": "name", "label": "Name", "fieldtype": "Data", "width": 150},
+        {"fieldname": "style_name", "label": "Style Name", "fieldtype": "Data", "width": 150},
+        {"fieldname": "style_id", "label": "Style ID", "fieldtype": "Data", "width": 100},
         {"fieldname": "date", "label": "Date", "fieldtype": "Date", "width": 120},
         {"fieldname": "operation", "label": "Operation", "fieldtype": "Data", "width": 150},
         {"fieldname": "total_pass_count", "label": "Total Pass Count", "fieldtype": "Int", "width": 120},
@@ -33,6 +38,8 @@ def execute(filters=None):
     ]
 
     data_rows = []
+
+    employee_map = {}
 
     current_date = fromdate_obj
     while current_date <= todate_obj:
@@ -50,46 +57,68 @@ def execute(filters=None):
         if data.get("status") != "success":
             frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
 
-        report_data = data.get("data", [])
+        operators = data.get("data", {})
 
-        for row in report_data:
-            # You can add this row directly if needed:
-            # data_rows.append({...})
+        for operator_id, operator_info in operators.items():
+            employee_key = operator_id
 
-            employee = row.get("employee")
-            employee_name = row.get("employee_name")
-            date = row.get("date")
+            if employee_key not in employee_map:
+                employee_map[employee_key] = {
+                    "info": operator_info,
+                    "rows": [],
+                    "total_pass_count": 0,
+                    "total_earning": 0,
+                }
 
-            # Fetch Earning Sheet where source is "Operator Tracking Hourly Report"
-            earning_sheets = frappe.get_all(
-                "Earning Sheet",
-                filters={
-                    "payroll_enrollment_id": employee,
-                    "operator_name": employee_name,
-                    "date": date,
-                    "source": "Operator Tracking Hourly Report"
-                },
-                fields=["name"]
-            )
+            for entry in operator_info.get("details", []):
+                row = {
+                    "operator_id": operator_id,
+                    "payroll_enrollment_id": operator_info.get("employee"),
+                    "operator_name": operator_info.get("employee_name"),
+                    "name": "",  # from API not available
+                    "style_name": entry.get("style_name"),
+                    "style_id": entry.get("style_id"),
+                    "date": entry.get("date"),
+                    "operation": entry.get("operation"),
+                    "total_pass_count": entry.get("total_pass_count"),
+                    "earning": entry.get("amount"),
+                    "rate": entry.get("rate"),
+                }
+                data_rows.append(row)
 
-            for es in earning_sheets:
-                # For each Earning Sheet, get child table data
-                child_entries = frappe.get_all(
-                    "Earning Sheet Type",
-                    filters={"parent": es.name},
-                    fields=["operation", "total_pass_count", "amount", "rate"]
-                )
+            # Now pull matching Earning Sheet records
+            employee = operator_info.get("employee")
+            employee_name = operator_info.get("employee_name")
+            date = operator_info.get("date")
 
-                for child in child_entries:
-                    data_rows.append({
+            if employee and employee_name and date:
+                earning_sheets = frappe.get_all(
+                    "Earning Sheet",
+                    filters={
                         "payroll_enrollment_id": employee,
                         "operator_name": employee_name,
                         "date": date,
-                        "operation": child.operation,
-                        "total_pass_count": child.total_pass_count,
-                        "earning": child.amount,
-                        "rate": child.rate
-                    })
+                        "source": "Operator Tracking Hourly Report"
+                    },
+                    fields=["name"]
+                )
+
+                for es in earning_sheets:
+                    es_doc = frappe.get_doc("Earning Sheet", es.name)
+                    for child in es_doc.earning_sheet_type:
+                        data_rows.append({
+                            "operator_id": operator_id,
+                            "payroll_enrollment_id": employee,
+                            "operator_name": employee_name,
+                            "name": es_doc.name,
+                            "style_name": "",  # not available in Earning Sheet
+                            "style_id": "",    # not available in Earning Sheet
+                            "date": date,
+                            "operation": child.operation,
+                            "total_pass_count": child.total_pass_count,
+                            "earning": child.amount,
+                            "rate": child.rate,
+                        })
 
         current_date += timedelta(days=1)
 
