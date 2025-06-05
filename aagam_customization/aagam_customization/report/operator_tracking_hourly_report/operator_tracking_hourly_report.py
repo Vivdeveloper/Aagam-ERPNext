@@ -77,23 +77,23 @@ def execute(filters=None):
             "source": "Operator Tracking Hourly Report",
             "date": ["between", [fromdate, todate]]
         },
-        fields=["name", "payroll_enrollment_id", "operator_name", "date"]
+        fields=["name", "employee", "employee_name", "date"]
     )
 
     for sheet in earning_sheets:
         child_rows = frappe.get_all(
             "Earning Sheet Type",
             filters={"parent": sheet.name},
-            fields=["operation", "total_pass_count", "earning", "rate"]
+            fields=["operation", "total_pass_count", "amount", "rate"]
         )
         for child in child_rows:
             data_rows.append({
-                "payroll_enrollment_id": sheet.payroll_enrollment_id,
-                "operator_name": sheet.operator_name,
+                "payroll_enrollment_id": sheet.employee,
+                "operator_name": sheet.employee_name,
                 "date": sheet.date,
                 "operation": child.operation,
                 "total_pass_count": child.total_pass_count,
-                "earning": child.earning,
+                "earning": child.amount,
                 "rate": child.rate
             })
 
