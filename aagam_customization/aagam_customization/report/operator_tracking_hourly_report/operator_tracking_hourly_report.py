@@ -43,24 +43,30 @@ def execute(filters=None):
         try:
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
+            data = response.json()
         except requests.exceptions.RequestException as e:
             frappe.throw(f"API Request Failed for {date_str}: {str(e)}")
+        except ValueError:
+            frappe.throw(f"Invalid JSON response from API for {date_str}")
 
-        data = response.json()
+        if not isinstance(data, dict):
+            frappe.throw(f"Unexpected response format from API for {date_str}: {data}")
+
         if data.get("status") != "success":
             frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
 
         report_data = data.get("data", [])
-        for row in report_data:
-            data_rows.append({
-                "payroll_enrollment_id": row.get("employee"),
-                "operator_name": row.get("employee_name"),
-                "date": row.get("date"),
-                "operation": row.get("operation"),
-                "total_pass_count": row.get("total_pass_count"),
-                "earning": row.get("amount"),
-                "rate": row.get("rate")
-            })
+        if isinstance(report_data, list):
+            for row in report_data:
+                data_rows.append({
+                    "payroll_enrollment_id": row.get("employee"),
+                    "operator_name": row.get("employee_name"),
+                    "date": row.get("date"),
+                    "operation": row.get("operation"),
+                    "total_pass_count": row.get("total_pass_count"),
+                    "earning": row.get("amount"),
+                    "rate": row.get("rate")
+                })
 
         current_date += timedelta(days=1)
 
