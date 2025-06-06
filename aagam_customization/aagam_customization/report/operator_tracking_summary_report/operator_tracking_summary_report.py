@@ -39,7 +39,7 @@ def execute(filters=None):
     ]
 
     data_rows = []
-    all_data = {}  # Used for grouping
+    employee_map = {}  # Used for grouping
 
     current_date = fromdate_obj
     while current_date <= todate_obj:
@@ -62,8 +62,8 @@ def execute(filters=None):
         for operator_id, operator_info in operators.items():
             employee_key = operator_id
 
-            if employee_key not in all_data:
-                all_data[employee_key] = {
+            if employee_key not in employee_map:
+                employee_map[employee_key] = {
                     "info": operator_info,
                     "rows": [],
                     "total_pass_count": 0,
@@ -87,38 +87,100 @@ def execute(filters=None):
                         "date": date_str,  # always include date
                     }
 
-                    all_data[employee_key]["rows"].append(row)
+                    employee_map[employee_key]["rows"].append(row)
 
                     # Accumulate totals
-                    all_data[employee_key]["total_pass_count"] += row["total_pass_count"]
-                    all_data[employee_key]["total_earning"] += row["earning"]
-                    all_data[employee_key]["total_rate"] += row["rate"]
+                    employee_map[employee_key]["total_pass_count"] += row["total_pass_count"]
+                    employee_map[employee_key]["total_earning"] += row["earning"]
+                    employee_map[employee_key]["total_rate"] += row["rate"]
 
         current_date += timedelta(days=1)
 
-    if group_by_employee:
-        for emp_id, emp_data in all_data.items():
-            # Add each row
-            data_rows.extend(emp_data["rows"])
+    # Fetch Earning Sheet data and group by employee
+    earning_sheets = frappe.get_all(
+        "Earning Sheet",
+        filters={
+            "source": "Operator Tracking Summary Report",
+            "date": ["between", [fromdate, todate]]
+        },
+        fields=["name", "employee", "employee_name", "date"]
+    )
 
-            # Add total row for each employee
-            operator_info = emp_data["info"]
-            total_row = {
+    earning_sheet_map = {}
+
+    for sheet in earning_sheets:
+        emp_key = sheet.employee
+        if emp_key not in earning_sheet_map:
+            earning_sheet_map[emp_key] = {
+                "info": {
+                    "payroll_enrollment_id": sheet.employee,
+                    "operator_name": sheet.employee_name,
+                    "name": sheet.employee_name
+                },
+                "rows": [],
+                "total_pass_count": 0,
+                "total_earning": 0,
+                "total_rate": 0
+            }
+
+        child_rows = frappe.get_all(
+            "Earning Sheet Type",
+            filters={"parent": sheet.name},
+            fields=["operation", "total_pass_count", "amount", "rate"]
+        )
+
+        for child in child_rows:
+            row = {
+                "payroll_enrollment_id": sheet.employee,
+                "operator_name": sheet.employee_name,
+                "name": sheet.employee_name,
+                "style_name": "-",
+                "style_id": "-",
+                "date": sheet.date,
+                "operation": child.operation,
+                "total_pass_count": child.total_pass_count,
+                "earning": child.amount,
+                "rate": child.rate
+            }
+
+            earning_sheet_map[emp_key]["rows"].append(row)
+            earning_sheet_map[emp_key]["total_pass_count"] += child.total_pass_count or 0
+            earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
+            earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
+
+    # Combine all data and add totals if grouped
+    for emp_id, emp_data in employee_map.items():
+        data_rows.extend(emp_data["rows"])
+        if group_by_employee:
+            data_rows.append({
                 "operator_id": f"<b>{emp_id}</b>",
-                "payroll_enrollment_id": f"<b>{operator_info.get('payroll_enrollment_id')}</b>",
-                "operator_name": f"<b>{operator_info.get('operator_name')}</b>",
-                "name": f"<b>{operator_info.get('name')}</b>",
-                "style_id": "",
+                "payroll_enrollment_id": f"<b>{emp_data['info'].get('payroll_enrollment_id')}</b>",
+                "operator_name": f"<b>{emp_data['info'].get('operator_name')}</b>",
+                "name": f"<b>{emp_data['info'].get('name')}</b>",
                 "style_name": "<b>TOTAL</b>",
+                "style_id": "-",
+                "date": "-",
                 "operation": "<b>TOTAL</b>",
                 "total_pass_count": emp_data["total_pass_count"],
                 "earning": emp_data["total_earning"],
                 "rate": emp_data["total_rate"],
-                "date": "",  # blank date for total row
-            }
-            data_rows.append(total_row)
-    else:
-        for emp_data in all_data.values():
-            data_rows.extend(emp_data["rows"])
+            })
+
+    for emp_id, emp_data in earning_sheet_map.items():
+        data_rows.extend(emp_data["rows"])
+        if group_by_employee:
+            data_rows.append({
+                "operator_id": f"<b>{emp_id}</b>",
+                "payroll_enrollment_id": f"<b>{emp_data['info'].get('payroll_enrollment_id')}</b>",
+                "operator_name": f"<b>{emp_data['info'].get('operator_name')}</b>",
+                "name": f"<b>{emp_data['info'].get('name')}</b>",
+                "style_name": "<b>TOTAL</b>",
+                "style_id": "-",
+                "date": "-",
+                "operation": "<b>TOTAL</b>",
+                "total_pass_count": emp_data["total_pass_count"],
+                "earning": emp_data["total_earning"],
+                "rate": emp_data["total_rate"],
+            })
 
     return columns, data_rows
