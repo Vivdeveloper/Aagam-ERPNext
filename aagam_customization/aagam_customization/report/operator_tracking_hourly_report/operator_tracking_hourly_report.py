@@ -12,6 +12,7 @@ def execute(filters=None):
     fromdate = filters.get("fromdate")
     todate = filters.get("todate")
     group_by_employee = filters.get("group_by_employee", False)
+    payroll_enrollment_id = filters.get("payroll_enrollment_id")
 
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
@@ -39,7 +40,6 @@ def execute(filters=None):
     data_rows = []
     employee_map = {}
 
-    # Fetch API data and organize by employee
     current_date = fromdate_obj
     while current_date <= todate_obj:
         date_str = current_date.strftime("%Y-%m-%d")
@@ -59,6 +59,9 @@ def execute(filters=None):
         operators = data.get("data", {})
 
         for operator_id, operator_info in operators.items():
+            if payroll_enrollment_id and operator_info.get("payroll_enrollment_id") != payroll_enrollment_id:
+                continue
+
             emp_key = operator_id
             if emp_key not in employee_map:
                 employee_map[emp_key] = {
@@ -92,13 +95,18 @@ def execute(filters=None):
 
         current_date += timedelta(days=1)
 
-    # Fetch Earning Sheet data and group by employee
+    # Earning Sheets
+    earning_sheet_filters = {
+        "source": "Operator Tracking Hourly Report",
+        "date": ["between", [fromdate, todate]]
+    }
+
+    if payroll_enrollment_id:
+        earning_sheet_filters["employee"] = payroll_enrollment_id
+
     earning_sheets = frappe.get_all(
         "Earning Sheet",
-        filters={
-            "source": "Operator Tracking Hourly Report",
-            "date": ["between", [fromdate, todate]]
-        },
+        filters=earning_sheet_filters,
         fields=["name", "employee", "employee_name", "date"]
     )
 
@@ -144,7 +152,7 @@ def execute(filters=None):
             earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
             earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
 
-    # Combine all data and add totals if grouped
+    # Combine Data
     for emp_id, emp_data in employee_map.items():
         data_rows.extend(emp_data["rows"])
         if group_by_employee:

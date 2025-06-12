@@ -19,6 +19,13 @@ frappe.query_reports["Operator Tracking Hourly Report"] = {
             // reqd: 1
         },
         {
+            fieldname: "payroll_enrollment_id",
+            label: "Employee",
+            fieldtype: "Link",
+            options: "Employee",
+            reqd: 0
+        },
+        {
             fieldname: "group_by_employee",
             label: __("Group By Employee"),
             fieldtype: "Check"
