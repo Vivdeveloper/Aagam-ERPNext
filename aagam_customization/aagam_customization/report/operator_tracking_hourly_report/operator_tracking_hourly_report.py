@@ -13,7 +13,6 @@ def execute(filters=None):
     todate = filters.get("todate")
     group_by_employee = filters.get("group_by_employee", False)
     payroll_enrollment_id = filters.get("payroll_enrollment_id")
-    name_filter = filters.get("name")
 
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
@@ -53,6 +52,7 @@ def execute(filters=None):
             frappe.throw(f"API Request Failed for {date_str}: {str(e)}")
 
         data = response.json()
+
         if data.get("status") != "success":
             frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
 
@@ -60,8 +60,6 @@ def execute(filters=None):
 
         for operator_id, operator_info in operators.items():
             if payroll_enrollment_id and operator_info.get("payroll_enrollment_id") != payroll_enrollment_id:
-                continue
-            if name_filter and operator_info.get("name") != name_filter:
                 continue
 
             emp_key = operator_id
@@ -115,9 +113,6 @@ def execute(filters=None):
     earning_sheet_map = {}
 
     for sheet in earning_sheets:
-        if name_filter and sheet.employee_name != name_filter:
-            continue
-
         emp_key = sheet.employee
         if emp_key not in earning_sheet_map:
             earning_sheet_map[emp_key] = {
@@ -157,6 +152,7 @@ def execute(filters=None):
             earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
             earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
 
+    # Combine Data
     for emp_id, emp_data in employee_map.items():
         data_rows.extend(emp_data["rows"])
         if group_by_employee:
