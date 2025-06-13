@@ -12,6 +12,7 @@ def execute(filters=None):
     fromdate = filters.get("fromdate")
     todate = filters.get("todate")
     group_by_employee = filters.get("group_by_employee", False)
+    payroll_enrollment_id_filter = filters.get("payroll_enrollment_id")
 
     fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
     todate_obj = datetime.strptime(todate, "%Y-%m-%d")
@@ -23,7 +24,6 @@ def execute(filters=None):
         "Content-Type": "application/json"
     }
 
-   
     columns = [
         {"fieldname": "operator_id", "label": "Operator ID", "fieldtype": "Data", "width": 100},
         {"fieldname": "payroll_enrollment_id", "label": "Payroll ID", "fieldtype": "Data", "width": 120},
@@ -39,7 +39,7 @@ def execute(filters=None):
     ]
 
     data_rows = []
-    employee_map = {}  # Used for grouping
+    employee_map = {}
 
     current_date = fromdate_obj
     while current_date <= todate_obj:
@@ -60,6 +60,9 @@ def execute(filters=None):
         operators = data.get("data", {})
 
         for operator_id, operator_info in operators.items():
+            if payroll_enrollment_id_filter and operator_info.get("payroll_enrollment_id") != payroll_enrollment_id_filter:
+                continue
+
             employee_key = operator_id
 
             if employee_key not in employee_map:
@@ -84,19 +87,16 @@ def execute(filters=None):
                         "total_pass_count": style_data.get("total_production"),
                         "earning": style_data.get("earning"),
                         "rate": style_data.get("rate"),
-                        "date": date_str,  # always include date
+                        "date": date_str,
                     }
 
                     employee_map[employee_key]["rows"].append(row)
-
-                    # Accumulate totals
                     employee_map[employee_key]["total_pass_count"] += row["total_pass_count"]
                     employee_map[employee_key]["total_earning"] += row["earning"]
                     employee_map[employee_key]["total_rate"] += row["rate"]
 
         current_date += timedelta(days=1)
 
-    # Fetch Earning Sheet data and group by employee
     earning_sheets = frappe.get_all(
         "Earning Sheet",
         filters={
@@ -109,6 +109,9 @@ def execute(filters=None):
     earning_sheet_map = {}
 
     for sheet in earning_sheets:
+        if payroll_enrollment_id_filter and sheet.employee != payroll_enrollment_id_filter:
+            continue
+
         emp_key = sheet.employee
         if emp_key not in earning_sheet_map:
             earning_sheet_map[emp_key] = {
@@ -148,7 +151,6 @@ def execute(filters=None):
             earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
             earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
 
-    # Combine all data and add totals if grouped
     for emp_id, emp_data in employee_map.items():
         data_rows.extend(emp_data["rows"])
         if group_by_employee:
