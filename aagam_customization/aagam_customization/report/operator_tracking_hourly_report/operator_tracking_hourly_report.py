@@ -37,7 +37,6 @@ def execute(filters=None):
         {"fieldname": "rate", "label": "Rate", "fieldtype": "Currency", "width": 100},
     ]
 
-    data_rows = []
     employee_map = {}
 
     current_date = fromdate_obj
@@ -52,7 +51,6 @@ def execute(filters=None):
             frappe.throw(f"API Request Failed for {date_str}: {str(e)}")
 
         data = response.json()
-
         if data.get("status") != "success":
             frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
 
@@ -135,6 +133,7 @@ def execute(filters=None):
 
         for child in child_rows:
             row = {
+                "operator_id": emp_key,
                 "payroll_enrollment_id": sheet.employee,
                 "operator_name": sheet.employee_name,
                 "name": sheet.employee_name,
@@ -152,25 +151,35 @@ def execute(filters=None):
             earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
             earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
 
-    # Combine Data
-    for emp_id, emp_data in employee_map.items():
-        data_rows.extend(emp_data["rows"])
-        if group_by_employee:
-            data_rows.append({
-                "operator_id": f"<b>{emp_id}</b>",
-                "payroll_enrollment_id": f"<b>{emp_data['info'].get('payroll_enrollment_id')}</b>",
-                "operator_name": f"<b>{emp_data['info'].get('operator_name')}</b>",
-                "name": f"<b>{emp_data['info'].get('name')}</b>",
-                "style_name": "<b>TOTAL</b>",
-                "style_id": "-",
-                "date": "-",
-                "operation": "<b>TOTAL</b>",
-                "total_pass_count": emp_data["total_pass_count"],
-                "earning": emp_data["total_earning"],
-                "rate": emp_data["total_rate"],
-            })
+    # Combine both maps into single data_rows
+    data_rows = []
+    combined_map = {}
 
-    for emp_id, emp_data in earning_sheet_map.items():
+    for emp_id in set(list(employee_map.keys()) + list(earning_sheet_map.keys())):
+        combined_map[emp_id] = {
+            "info": {},
+            "rows": [],
+            "total_pass_count": 0,
+            "total_earning": 0,
+            "total_rate": 0
+        }
+
+        if emp_id in employee_map:
+            combined_map[emp_id]["info"] = employee_map[emp_id]["info"]
+            combined_map[emp_id]["rows"].extend(employee_map[emp_id]["rows"])
+            combined_map[emp_id]["total_pass_count"] += employee_map[emp_id]["total_pass_count"]
+            combined_map[emp_id]["total_earning"] += employee_map[emp_id]["total_earning"]
+            combined_map[emp_id]["total_rate"] += employee_map[emp_id]["total_rate"]
+
+        if emp_id in earning_sheet_map:
+            if not combined_map[emp_id]["info"]:
+                combined_map[emp_id]["info"] = earning_sheet_map[emp_id]["info"]
+            combined_map[emp_id]["rows"].extend(earning_sheet_map[emp_id]["rows"])
+            combined_map[emp_id]["total_pass_count"] += earning_sheet_map[emp_id]["total_pass_count"]
+            combined_map[emp_id]["total_earning"] += earning_sheet_map[emp_id]["total_earning"]
+            combined_map[emp_id]["total_rate"] += earning_sheet_map[emp_id]["total_rate"]
+
+    for emp_id, emp_data in combined_map.items():
         data_rows.extend(emp_data["rows"])
         if group_by_employee:
             data_rows.append({
