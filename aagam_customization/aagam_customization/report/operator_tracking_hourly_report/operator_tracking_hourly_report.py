@@ -37,15 +37,14 @@ def execute(filters=None):
         {"fieldname": "rate", "label": "Rate", "fieldtype": "Currency", "width": 100},
     ]
 
-    employee_map = {}
+    unified_map = {}
 
+    # Fetch Stitch API data
     current_date = fromdate_obj
     while current_date <= todate_obj:
         date_str = current_date.strftime("%Y-%m-%d")
-        params = {"date": date_str}
-
         try:
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers, params={"date": date_str})
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
             frappe.throw(f"API Request Failed for {date_str}: {str(e)}")
@@ -54,16 +53,19 @@ def execute(filters=None):
         if data.get("status") != "success":
             frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
 
-        operators = data.get("data", {})
-
-        for operator_id, operator_info in operators.items():
-            if payroll_enrollment_id and operator_info.get("payroll_enrollment_id") != payroll_enrollment_id:
+        for operator_id, operator_info in data.get("data", {}).items():
+            key = operator_info.get("payroll_enrollment_id")
+            if not key or (payroll_enrollment_id and key != payroll_enrollment_id):
                 continue
 
-            emp_key = operator_id
-            if emp_key not in employee_map:
-                employee_map[emp_key] = {
-                    "info": operator_info,
+            if key not in unified_map:
+                unified_map[key] = {
+                    "info": {
+                        "payroll_enrollment_id": key,
+                        "operator_name": operator_info.get("operator_name"),
+                        "name": operator_info.get("name"),
+                        "operator_id": operator_id,
+                    },
                     "rows": [],
                     "total_pass_count": 0,
                     "total_earning": 0,
@@ -74,7 +76,7 @@ def execute(filters=None):
                 for style_data in style.get("style_data", []):
                     row = {
                         "operator_id": operator_id,
-                        "payroll_enrollment_id": operator_info.get("payroll_enrollment_id"),
+                        "payroll_enrollment_id": key,
                         "operator_name": operator_info.get("operator_name"),
                         "name": operator_info.get("name"),
                         "style_name": style.get("style_name"),
@@ -85,39 +87,36 @@ def execute(filters=None):
                         "earning": style_data.get("earning"),
                         "rate": style_data.get("rate"),
                     }
-
-                    employee_map[emp_key]["rows"].append(row)
-                    employee_map[emp_key]["total_pass_count"] += row["total_pass_count"] or 0
-                    employee_map[emp_key]["total_earning"] += row["earning"] or 0
-                    employee_map[emp_key]["total_rate"] += row["rate"] or 0
+                    unified_map[key]["rows"].append(row)
+                    unified_map[key]["total_pass_count"] += row["total_pass_count"] or 0
+                    unified_map[key]["total_earning"] += row["earning"] or 0
+                    unified_map[key]["total_rate"] += row["rate"] or 0
 
         current_date += timedelta(days=1)
 
-    # Earning Sheets
+    # Fetch Earning Sheet Data
     earning_sheet_filters = {
         "source": "Operator Tracking Hourly Report",
         "date": ["between", [fromdate, todate]]
     }
-
     if payroll_enrollment_id:
         earning_sheet_filters["employee"] = payroll_enrollment_id
 
-    earning_sheets = frappe.get_all(
+    sheets = frappe.get_all(
         "Earning Sheet",
         filters=earning_sheet_filters,
         fields=["name", "employee", "employee_name", "date"]
     )
 
-    earning_sheet_map = {}
-
-    for sheet in earning_sheets:
-        emp_key = sheet.employee
-        if emp_key not in earning_sheet_map:
-            earning_sheet_map[emp_key] = {
+    for sheet in sheets:
+        key = sheet.employee
+        if key not in unified_map:
+            unified_map[key] = {
                 "info": {
-                    "payroll_enrollment_id": sheet.employee,
+                    "payroll_enrollment_id": key,
                     "operator_name": sheet.employee_name,
-                    "name": sheet.employee_name
+                    "name": sheet.employee_name,
+                    "operator_id": key,
                 },
                 "rows": [],
                 "total_pass_count": 0,
@@ -133,8 +132,8 @@ def execute(filters=None):
 
         for child in child_rows:
             row = {
-                "operator_id": emp_key,
-                "payroll_enrollment_id": sheet.employee,
+                "operator_id": key,
+                "payroll_enrollment_id": key,
                 "operator_name": sheet.employee_name,
                 "name": sheet.employee_name,
                 "style_name": "-",
@@ -145,55 +144,28 @@ def execute(filters=None):
                 "earning": child.amount,
                 "rate": child.rate
             }
+            unified_map[key]["rows"].append(row)
+            unified_map[key]["total_pass_count"] += child.total_pass_count or 0
+            unified_map[key]["total_earning"] += child.amount or 0
+            unified_map[key]["total_rate"] += child.rate or 0
 
-            earning_sheet_map[emp_key]["rows"].append(row)
-            earning_sheet_map[emp_key]["total_pass_count"] += child.total_pass_count or 0
-            earning_sheet_map[emp_key]["total_earning"] += child.amount or 0
-            earning_sheet_map[emp_key]["total_rate"] += child.rate or 0
-
-    # Combine both maps into single data_rows
+    # Prepare final data
     data_rows = []
-    combined_map = {}
-
-    for emp_id in set(list(employee_map.keys()) + list(earning_sheet_map.keys())):
-        combined_map[emp_id] = {
-            "info": {},
-            "rows": [],
-            "total_pass_count": 0,
-            "total_earning": 0,
-            "total_rate": 0
-        }
-
-        if emp_id in employee_map:
-            combined_map[emp_id]["info"] = employee_map[emp_id]["info"]
-            combined_map[emp_id]["rows"].extend(employee_map[emp_id]["rows"])
-            combined_map[emp_id]["total_pass_count"] += employee_map[emp_id]["total_pass_count"]
-            combined_map[emp_id]["total_earning"] += employee_map[emp_id]["total_earning"]
-            combined_map[emp_id]["total_rate"] += employee_map[emp_id]["total_rate"]
-
-        if emp_id in earning_sheet_map:
-            if not combined_map[emp_id]["info"]:
-                combined_map[emp_id]["info"] = earning_sheet_map[emp_id]["info"]
-            combined_map[emp_id]["rows"].extend(earning_sheet_map[emp_id]["rows"])
-            combined_map[emp_id]["total_pass_count"] += earning_sheet_map[emp_id]["total_pass_count"]
-            combined_map[emp_id]["total_earning"] += earning_sheet_map[emp_id]["total_earning"]
-            combined_map[emp_id]["total_rate"] += earning_sheet_map[emp_id]["total_rate"]
-
-    for emp_id, emp_data in combined_map.items():
-        data_rows.extend(emp_data["rows"])
+    for key, emp in unified_map.items():
+        data_rows.extend(emp["rows"])
         if group_by_employee:
             data_rows.append({
-                "operator_id": f"<b>{emp_id}</b>",
-                "payroll_enrollment_id": f"<b>{emp_data['info'].get('payroll_enrollment_id')}</b>",
-                "operator_name": f"<b>{emp_data['info'].get('operator_name')}</b>",
-                "name": f"<b>{emp_data['info'].get('name')}</b>",
+                "operator_id": f"<b>{emp['info']['operator_id']}</b>",
+                "payroll_enrollment_id": f"<b>{emp['info']['payroll_enrollment_id']}</b>",
+                "operator_name": f"<b>{emp['info']['operator_name']}</b>",
+                "name": f"<b>{emp['info']['name']}</b>",
                 "style_name": "<b>TOTAL</b>",
                 "style_id": "-",
                 "date": "-",
                 "operation": "<b>TOTAL</b>",
-                "total_pass_count": emp_data["total_pass_count"],
-                "earning": emp_data["total_earning"],
-                "rate": emp_data["total_rate"],
+                "total_pass_count": emp["total_pass_count"],
+                "earning": emp["total_earning"],
+                "rate": emp["total_rate"],
             })
 
     return columns, data_rows
