@@ -84,11 +84,11 @@ def execute(filters=None):
 					    "job_card_reference": None,
 					    "production_plan": None,
 					    "production_item": None,
-					    "operation": None,
+					    "operation": "<b>TOTAL</b>",
 					    "insert_completed_qty": total_qty,
 					    "operation_rate": None,
-					    "amount": total_amount,
-                        "is_total_row": 1 
+					    "amount": total_amount
+                        # "is_total_row": 1 
 					})
                 current_employee = row["employee"]
                 current_employee_name = row.get("employee_name") or ""
@@ -109,11 +109,11 @@ def execute(filters=None):
 				"job_card_reference": None,
 				"production_plan": None,
 				"production_item": None,
-				"operation": None,
+				"operation": "<b>TOTAL</b>",
 				"insert_completed_qty": total_qty,
 				"operation_rate": None,
-				"amount": total_amount,
-                "is_total_row": 1 
+				"amount": total_amount
+                # "is_total_row": 1 
 			})
 
         return columns, grouped_result
