@@ -99,18 +99,20 @@ def execute(filters=None):
 
         if current_employee:
             grouped_result.append({
-			    "employee": f"<b>{current_employee}</b>",
-			    "employee_name": f"<b>Total</b>",
-			    "department": "<b>-</b>",
-			    "posting_date": "<b>-</b>",
-			    "job_card_reference": "<b>-</b>",
-			    "production_plan": "<b>-</b>",
-			    "production_item": "<b>-</b>",
-			    "operation": "<b>-</b>",
-			    "insert_completed_qty": f"<b>{total_qty}</b>",
-			    "operation_rate": "<b>-</b>",
-			    "amount": f"<b>{total_amount}</b>"
+			    "employee": current_employee,
+			    "employee_name": "Total",
+			    "department": "",
+			    "posting_date": "",
+			    "job_card_reference": "",
+			    "production_plan": "",
+			    "production_item": "",
+			    "operation": "Total",
+			    "insert_completed_qty": total_qty,
+			    "operation_rate": "",
+			    "amount": total_amount,
+			    "is_total_row": 1
 			})
+
 
 
         return columns, grouped_result
