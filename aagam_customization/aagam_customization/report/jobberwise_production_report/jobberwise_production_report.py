@@ -85,9 +85,10 @@ def execute(filters=None):
 					    "production_plan": None,
 					    "production_item": None,
 					    "operation": None,
-					    "insert_completed_qty": f"<b>{frappe.format_value(total_qty, {'fieldtype': 'Float'})}</b>",
+					    "insert_completed_qty": total_qty,
 					    "operation_rate": None,
-					    "amount": f"<b>{frappe.format_value(total_amount, {'fieldtype': 'Currency'})}</b>"
+					    "amount": total_amount,
+                        "is_total_row": 1 
 					})
                 current_employee = row["employee"]
                 current_employee_name = row.get("employee_name") or ""
@@ -109,9 +110,10 @@ def execute(filters=None):
 				"production_plan": None,
 				"production_item": None,
 				"operation": None,
-				"insert_completed_qty": f"<b>{frappe.format_value(total_qty, {'fieldtype': 'Float'})}</b>",
+				"insert_completed_qty": total_qty,
 				"operation_rate": None,
-				"amount": f"<b>{frappe.format_value(total_amount, {'fieldtype': 'Currency'})}</b>"
+				"amount": total_amount,
+                "is_total_row": 1 
 			})
 
         return columns, grouped_result
