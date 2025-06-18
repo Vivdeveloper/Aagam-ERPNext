@@ -103,7 +103,8 @@ def execute(filters=None):
         "Earning Sheet",
         filters={
             "source": "Operator Tracking Summary Report",
-            "date": ["between", [fromdate, todate]]
+            "date": ["between", [fromdate, todate]],
+            "docstatus": 1
         },
         fields=["name", "employee", "employee_name", "date"]
     )

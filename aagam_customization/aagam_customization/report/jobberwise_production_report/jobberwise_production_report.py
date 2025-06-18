@@ -77,18 +77,18 @@ def execute(filters=None):
             if row["employee"] != current_employee:
                 if current_employee:
                     grouped_result.append({
-                        "employee": f"<b>{current_employee}</b>",
-                        "employee_name": f"<b>{current_employee_name}</b>",
-                        "department": "<b></b>",
-                        "posting_date": "<b></b>",
-                        "job_card_reference": "<b></b>",
-                        "production_plan": "<b></b>",
-                        "production_item": "<b></b>",
-                        "operation": "<b></b>",
-                        "insert_completed_qty": f"<b>{total_qty}</b>",
-                        "operation_rate": "<b></b>",
-                        "amount": f"<b>{total_amount}</b>"
-                    })
+					    "employee": f"<b>{current_employee}</b>",
+					    "employee_name": f"<b>{current_employee_name}</b>",
+					    "department": None,
+					    "posting_date": None,
+					    "job_card_reference": None,
+					    "production_plan": None,
+					    "production_item": None,
+					    "operation": None,
+					    "insert_completed_qty": total_qty,
+					    "operation_rate": None,
+					    "amount": total_amount
+					})
                 current_employee = row["employee"]
                 current_employee_name = row.get("employee_name") or ""
                 total_qty = 0
@@ -101,18 +101,18 @@ def execute(filters=None):
         # Final group total row
         if current_employee:
             grouped_result.append({
-                "employee": f"<b>{current_employee}</b>",
-                "employee_name": f"<b>{current_employee_name}</b>",
-                "department": "<b></b>",
-                "posting_date": "<b></b>",
-                "job_card_reference": "<b></b>",
-                "production_plan": "<b></b>",
-                "production_item": "<b></b>",
-                "operation": "<b></b>",
-                "insert_completed_qty": f"<b>{total_qty}</b>",
-                "operation_rate": "<b></b>",
-                "amount": f"<b>{total_amount}</b>"
-            })
+				"employee": f"<b>{current_employee}</b>",
+				"employee_name": f"<b>{current_employee_name}</b>",
+				"department": None,
+				"posting_date": None,
+				"job_card_reference": None,
+				"production_plan": None,
+				"production_item": None,
+				"operation": None,
+				"insert_completed_qty": total_qty,
+				"operation_rate": None,
+				"amount": total_amount
+			})
 
         return columns, grouped_result
 
