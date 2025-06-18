@@ -104,7 +104,7 @@ def execute(filters=None):
 
     sheets = frappe.get_all(
         "Earning Sheet",
-        filters=earning_sheet_filters,
+        filters={**earning_sheet_filters, "docstatus": 1},
         fields=["name", "employee", "employee_name", "date"]
     )
 
