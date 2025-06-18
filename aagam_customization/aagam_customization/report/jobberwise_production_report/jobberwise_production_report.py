@@ -77,7 +77,7 @@ def execute(filters=None):
             if row["employee"] != current_employee:
                 if current_employee:
                     grouped_result.append({
-					    "employee": f"<b>{current_employee}</b>",
+					    "employee": current_employee,
 					    "employee_name": f"<b>{current_employee_name}</b>",
 					    "department": None,
 					    "posting_date": None,
@@ -85,9 +85,9 @@ def execute(filters=None):
 					    "production_plan": None,
 					    "production_item": None,
 					    "operation": None,
-					    "insert_completed_qty": total_qty,
+					    "insert_completed_qty": f"<b>{frappe.format_value(total_qty, {'fieldtype': 'Float'})}</b>",
 					    "operation_rate": None,
-					    "amount": total_amount
+					    "amount": f"<b>{frappe.format_value(total_amount, {'fieldtype': 'Currency'})}</b>"
 					})
                 current_employee = row["employee"]
                 current_employee_name = row.get("employee_name") or ""
@@ -101,7 +101,7 @@ def execute(filters=None):
         # Final group total row
         if current_employee:
             grouped_result.append({
-				"employee": f"<b>{current_employee}</b>",
+				"employee": current_employee,
 				"employee_name": f"<b>{current_employee_name}</b>",
 				"department": None,
 				"posting_date": None,
@@ -109,9 +109,9 @@ def execute(filters=None):
 				"production_plan": None,
 				"production_item": None,
 				"operation": None,
-				"insert_completed_qty": total_qty,
+				"insert_completed_qty": f"<b>{frappe.format_value(total_qty, {'fieldtype': 'Float'})}</b>",
 				"operation_rate": None,
-				"amount": total_amount
+				"amount": f"<b>{frappe.format_value(total_amount, {'fieldtype': 'Currency'})}</b>"
 			})
 
         return columns, grouped_result
