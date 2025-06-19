@@ -84,7 +84,7 @@ def execute(filters=None):
 					    "job_card_reference": None,
 					    "production_plan": None,
 					    "production_item": None,
-					    "operation": "<b>TOTAL</b>",
+					    "operation": "Total",
 					    "insert_completed_qty": total_qty,
 					    "operation_rate": None,
 					    "amount": total_amount
@@ -109,7 +109,7 @@ def execute(filters=None):
 				"job_card_reference": None,
 				"production_plan": None,
 				"production_item": None,
-				"operation": "<b>TOTAL</b>",
+				"operation": "Total",
 				"insert_completed_qty": total_qty,
 				"operation_rate": None,
 				"amount": total_amount
