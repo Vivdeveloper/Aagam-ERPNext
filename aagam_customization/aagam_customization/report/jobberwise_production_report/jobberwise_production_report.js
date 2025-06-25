@@ -42,6 +42,12 @@ frappe.query_reports["Jobberwise Production Report"] = {
             "options": "Operation"
         },
         {
+            "fieldname": "production_item",
+            "label": "Production Item",
+            "fieldtype": "Link",
+            "options": "Item"
+        },
+        {
             "fieldname": "grp_by_emp",
             "label": "Group by Employee",
             "fieldtype": "Check"

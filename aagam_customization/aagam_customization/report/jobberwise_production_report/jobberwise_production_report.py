@@ -32,6 +32,11 @@ def execute(filters=None):
         conditions += " AND child.operation_name = %(operation)s"
     if filters.get("department"):
         conditions += " AND parent.department = %(department)s"
+    if filters.get("production_item"):
+        conditions += " AND child.production_item = %(production_item)s"
+
+    # ✅ Only show items with job_card_reference
+    conditions += " AND child.job_card_reference IS NOT NULL AND child.job_card_reference <> ''"
 
     query = f"""
         SELECT
@@ -77,19 +82,18 @@ def execute(filters=None):
             if row["employee"] != current_employee:
                 if current_employee:
                     grouped_result.append({
-					    "employee": current_employee,
-					    "employee_name": f"<b>{current_employee_name}</b>",
-					    "department": None,
-					    "posting_date": None,
-					    "job_card_reference": None,
-					    "production_plan": None,
-					    "production_item": None,
-					    "operation": "Total",
-					    "insert_completed_qty": total_qty,
-					    "operation_rate": None,
-					    "amount": total_amount
-                        # "is_total_row": 1 
-					})
+                        "employee": current_employee,
+                        "employee_name": f"<b>{current_employee_name}</b>",
+                        "department": None,
+                        "posting_date": None,
+                        "job_card_reference": None,
+                        "production_plan": None,
+                        "production_item": None,
+                        "operation": "Total",
+                        "insert_completed_qty": total_qty,
+                        "operation_rate": None,
+                        "amount": total_amount
+                    })
                 current_employee = row["employee"]
                 current_employee_name = row.get("employee_name") or ""
                 total_qty = 0
@@ -99,22 +103,20 @@ def execute(filters=None):
             total_amount += row.get("amount") or 0
             grouped_result.append(row)
 
-        # Final group total row
         if current_employee:
             grouped_result.append({
-				"employee": current_employee,
-				"employee_name": f"<b>{current_employee_name}</b>",
-				"department": None,
-				"posting_date": None,
-				"job_card_reference": None,
-				"production_plan": None,
-				"production_item": None,
-				"operation": "Total",
-				"insert_completed_qty": total_qty,
-				"operation_rate": None,
-				"amount": total_amount
-                # "is_total_row": 1 
-			})
+                "employee": current_employee,
+                "employee_name": f"<b>{current_employee_name}</b>",
+                "department": None,
+                "posting_date": None,
+                "job_card_reference": None,
+                "production_plan": None,
+                "production_item": None,
+                "operation": "Total",
+                "insert_completed_qty": total_qty,
+                "operation_rate": None,
+                "amount": total_amount
+            })
 
         return columns, grouped_result
 
