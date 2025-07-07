@@ -1,15 +1,13 @@
 # Copyright (c) 2025, Sushant and contributors
 # For license information, please see license.txt
 
-# import frappe
-
-
 import frappe
 
 def execute(filters=None):
     filters = filters or {}
 
     columns = [
+        {"label": "WO Count ID", "fieldname": "wo_count_id", "fieldtype": "Link", "options": "WO Count", "width": 150},
         {"label": "Employee", "fieldname": "employee", "fieldtype": "Link", "options": "Employee", "width": 120},
         {"label": "Employee Name", "fieldname": "employee_name", "fieldtype": "Data", "width": 150},
         {"label": "Department", "fieldname": "department", "fieldtype": "Link", "options": "Department", "width": 150},
@@ -40,6 +38,7 @@ def execute(filters=None):
 
     query = f"""
         SELECT
+            parent.name AS wo_count_id,
             parent.employee,
             emp.employee_name,
             parent.department,
@@ -82,6 +81,7 @@ def execute(filters=None):
             if row["employee"] != current_employee:
                 if current_employee:
                     grouped_result.append({
+                        "wo_count_id": None,
                         "employee": current_employee,
                         "employee_name": f"<b>{current_employee_name}</b>",
                         "department": None,
@@ -105,6 +105,7 @@ def execute(filters=None):
 
         if current_employee:
             grouped_result.append({
+                "wo_count_id": None,
                 "employee": current_employee,
                 "employee_name": f"<b>{current_employee_name}</b>",
                 "department": None,
