@@ -250,4 +250,9 @@ override_doctype_class = {
 }
 
 
+override_whitelisted_methods = {
+    "erpnext.controllers.accounts_controller.update_child_qty_rate": "aagam_customization.aagam_customization.doctype.custom_script.po_code.update_child_qty_rate"
+}
+
+
 
