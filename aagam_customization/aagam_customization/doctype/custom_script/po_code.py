@@ -64,7 +64,7 @@ from erpnext.setup.utils import get_exchange_rate
 from erpnext.stock.doctype.item.item import get_uom_conv_factor
 from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 from erpnext.stock.get_item_details import (
-	ItemDetailsCtx,
+	# ItemDetailsCtx,
 	_get_item_tax_template,
 	get_conversion_factor,
 	get_item_details,
