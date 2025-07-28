@@ -1,6 +1,3 @@
-# Copyright (c) 2025, Sushant and contributors
-# For license information, please see license.txt
-
 import frappe
 
 def execute(filters=None):
@@ -33,7 +30,6 @@ def execute(filters=None):
     if filters.get("production_item"):
         conditions += " AND child.production_item = %(production_item)s"
 
-    # ✅ Only show items with job_card_reference
     conditions += " AND child.job_card_reference IS NOT NULL AND child.job_card_reference <> ''"
 
     query = f"""
@@ -69,6 +65,35 @@ def execute(filters=None):
         query += " ORDER BY parent.posting_date"
 
     result = frappe.db.sql(query, filters, as_dict=True)
+
+    # 🔄 Also fetch Earning Sheet data
+    earning_data = frappe.db.sql("""
+        SELECT
+            es.name AS wo_count_id,
+            es.employee,
+            emp.employee_name,
+            NULL AS department,
+            es.date AS posting_date,
+            NULL AS job_card_reference,
+            NULL AS production_plan,
+            NULL AS production_item,
+            est.operation,
+            est.total_pass_count AS insert_completed_qty,
+            est.rate AS operation_rate,
+            est.amount
+        FROM
+            `tabEarning Sheet` es
+        JOIN
+            `tabEarning Sheet Type` est ON est.parent = es.name
+        LEFT JOIN
+            `tabEmployee` emp ON emp.name = es.employee
+        WHERE
+            es.docstatus = 1
+            AND es.date BETWEEN %(from_date)s AND %(to_date)s
+            AND es.company = 'SUVIDHI FASHION'
+    """, filters, as_dict=True)
+
+    result.extend(earning_data)
 
     if filters.get("grp_by_emp"):
         grouped_result = []
