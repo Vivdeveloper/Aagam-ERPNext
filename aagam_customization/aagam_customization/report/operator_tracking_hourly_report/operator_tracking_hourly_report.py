@@ -1,171 +1,146 @@
-import requests
 import frappe
-from datetime import datetime, timedelta
-
-STITCH_BASE_URL = "http://portal2.stitcherp.com"
-STITCH_API_SECRET_KEY = "674eea38-f7a7-45d5-8317-d6295287b125"
 
 def execute(filters=None):
-    if not filters or not filters.get("fromdate") or not filters.get("todate"):
-        frappe.throw("From Date and To Date filters are required")
-
-    fromdate = filters.get("fromdate")
-    todate = filters.get("todate")
-    group_by_employee = filters.get("group_by_employee", False)
-    payroll_enrollment_id = filters.get("payroll_enrollment_id")
-
-    fromdate_obj = datetime.strptime(fromdate, "%Y-%m-%d")
-    todate_obj = datetime.strptime(todate, "%Y-%m-%d")
-
-    url = f"{STITCH_BASE_URL}/api/integration/operator-tracking-hourly-report"
-    headers = {
-        "STITCH-KEY": STITCH_API_SECRET_KEY,
-        "Content-Type": "application/json"
-    }
+    filters = filters or {}
 
     columns = [
-        {"fieldname": "operator_id", "label": "Operator ID", "fieldtype": "Data", "width": 100},
-        {"fieldname": "payroll_enrollment_id", "label": "Payroll ID", "fieldtype": "Data", "width": 120},
-        {"fieldname": "operator_name", "label": "Operator Name", "fieldtype": "Data", "width": 150},
-        {"fieldname": "name", "label": "Name", "fieldtype": "Data", "width": 150},
-        {"fieldname": "style_name", "label": "Style Name", "fieldtype": "Data", "width": 150},
-        {"fieldname": "style_id", "label": "Style ID", "fieldtype": "Data", "width": 100},
-        {"fieldname": "date", "label": "Date", "fieldtype": "Date", "width": 120},
-        {"fieldname": "operation", "label": "Operation", "fieldtype": "Data", "width": 150},
-        {"fieldname": "total_pass_count", "label": "Total Pass Count", "fieldtype": "Int", "width": 120},
-        {"fieldname": "earning", "label": "Earning", "fieldtype": "Currency", "width": 120},
-        {"fieldname": "rate", "label": "Rate", "fieldtype": "Currency", "width": 100},
+        {"label": "Job Card No.", "fieldname": "job_card_reference", "fieldtype": "Link", "options": "Job Card", "width": 150},
+        {"label": "Employee", "fieldname": "employee", "fieldtype": "Data", "width": 120},
+        {"label": "Employee Name", "fieldname": "employee_name", "fieldtype": "Data", "width": 150},
+        {"label": "Department", "fieldname": "department", "fieldtype": "Data", "width": 150},
+        {"label": "Posting Date", "fieldname": "posting_date", "fieldtype": "Date", "width": 120},
+        {"label": "WO Count ID", "fieldname": "wo_count_id", "fieldtype": "Link", "options": "WO Count", "width": 150},
+        {"label": "Production Plan", "fieldname": "production_plan", "fieldtype": "Link", "options": "Production Plan", "width": 150},
+        {"label": "Production Item", "fieldname": "production_item", "fieldtype": "Data", "width": 150},
+        {"label": "Operation", "fieldname": "operation", "fieldtype": "Data", "width": 150},
+        {"label": "Completed Qty", "fieldname": "insert_completed_qty", "fieldtype": "Float", "width": 120},
+        {"label": "Operation Rate", "fieldname": "operation_rate", "fieldtype": "Currency", "width": 120},
+        {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 120},
     ]
 
-    unified_map = {}
+    conditions = "1=1"
+    if filters.get("employee"):
+        conditions += " AND parent.employee = %(employee)s"
+    if filters.get("production_plan"):
+        conditions += " AND child.production_plan = %(production_plan)s"
+    if filters.get("operation"):
+        conditions += " AND child.operation_name = %(operation)s"
+    if filters.get("department"):
+        conditions += " AND parent.department = %(department)s"
+    if filters.get("production_item"):
+        conditions += " AND child.production_item = %(production_item)s"
 
-    # Fetch Stitch API data
-    current_date = fromdate_obj
-    while current_date <= todate_obj:
-        date_str = current_date.strftime("%Y-%m-%d")
-        try:
-            response = requests.get(url, headers=headers, params={"date": date_str})
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            frappe.throw(f"API Request Failed for {date_str}: {str(e)}")
+    conditions += " AND child.job_card_reference IS NOT NULL AND child.job_card_reference <> ''"
 
-        data = response.json()
-        if data.get("status") != "success":
-            frappe.throw(data.get("data", {}).get("message", f"Unknown error for {date_str}"))
+    # 🔍 WO Count Data
+    wo_data = frappe.db.sql(f"""
+        SELECT
+            child.job_card_reference,
+            parent.employee,
+            emp.employee_name,
+            parent.department,
+            parent.posting_date,
+            parent.name AS wo_count_id,
+            child.production_plan,
+            child.production_item,
+            child.operation_name AS operation,
+            child.insert_completed_qty,
+            parent.operation_rate,
+            (child.insert_completed_qty * parent.operation_rate) AS amount
+        FROM
+            `tabWO Count` AS parent
+        JOIN
+            `tabWO Count Item` AS child ON child.parent = parent.name
+        LEFT JOIN
+            `tabEmployee` AS emp ON emp.name = parent.employee
+        WHERE
+            parent.docstatus = 1
+            AND parent.posting_date BETWEEN %(from_date)s AND %(to_date)s
+            AND parent.company = 'SUVIDHI FASHION'
+            AND {conditions}
+    """, filters, as_dict=True)
 
-        for operator_id, operator_info in data.get("data", {}).items():
-            key = operator_info.get("payroll_enrollment_id")
-            if not key or (payroll_enrollment_id and key != payroll_enrollment_id):
-                continue
+    # 🔍 Earning Sheet Data
+    earning_data = frappe.db.sql("""
+        SELECT
+            NULL AS job_card_reference,
+            es.employee,
+            emp.employee_name,
+            NULL AS department,
+            es.date AS posting_date,
+            es.name AS wo_count_id,
+            NULL AS production_plan,
+            NULL AS production_item,
+            est.operation,
+            NULL AS insert_completed_qty,
+            NULL AS operation_rate,
+            est.amount
+        FROM
+            `tabEarning Sheet` es
+        JOIN
+            `tabEarning Sheet Type` est ON est.parent = es.name
+        LEFT JOIN
+            `tabEmployee` emp ON emp.name = es.employee
+        WHERE
+            es.docstatus = 1
+            AND es.date BETWEEN %(from_date)s AND %(to_date)s
+            AND es.company = 'SUVIDHI FASHION'
+    """, filters, as_dict=True)
 
-            if key not in unified_map:
-                unified_map[key] = {
-                    "info": {
-                        "payroll_enrollment_id": key,
-                        "operator_name": operator_info.get("operator_name"),
-                        "name": operator_info.get("name"),
-                        "operator_id": operator_id,
-                    },
-                    "rows": [],
-                    "total_pass_count": 0,
-                    "total_earning": 0,
-                    "total_rate": 0
-                }
+    all_data = wo_data + earning_data
 
-            for style in operator_info.get("styles", []):
-                for style_data in style.get("style_data", []):
-                    row = {
-                        "operator_id": operator_id,
-                        "payroll_enrollment_id": key,
-                        "operator_name": operator_info.get("operator_name"),
-                        "name": operator_info.get("name"),
-                        "style_name": style.get("style_name"),
-                        "style_id": style.get("style_id"),
-                        "date": date_str,
-                        "operation": style_data.get("operation"),
-                        "total_pass_count": style_data.get("total_pass_count"),
-                        "earning": style_data.get("earning"),
-                        "rate": style_data.get("rate"),
-                    }
-                    unified_map[key]["rows"].append(row)
-                    unified_map[key]["total_pass_count"] += row["total_pass_count"] or 0
-                    unified_map[key]["total_earning"] += row["earning"] or 0
-                    unified_map[key]["total_rate"] += row["rate"] or 0
+    if filters.get("grp_by_emp"):
+        grouped_result = []
+        current_employee = None
+        current_employee_name = ""
+        total_qty = 0
+        total_amount = 0
 
-        current_date += timedelta(days=1)
+        for row in all_data:
+            if row["employee"] != current_employee:
+                # Append total of previous employee
+                if current_employee:
+                    grouped_result.append({
+                        "job_card_reference": None,
+                        "employee": current_employee,
+                        "employee_name": f"{current_employee_name}",
+                        "department": None,
+                        "posting_date": None,
+                        "wo_count_id": None,
+                        "production_plan": None,
+                        "production_item": None,
+                        "operation": "<b>Total</b>",
+                        "insert_completed_qty": total_qty,
+                        "operation_rate": None,
+                        "amount": total_amount
+                    })
+                # Reset accumulators
+                current_employee = row["employee"]
+                current_employee_name = row.get("employee_name") or ""
+                total_qty = 0
+                total_amount = 0
 
-    # Fetch Earning Sheet Data
-    earning_sheet_filters = {
-        "source": "Operator Tracking Hourly Report",
-        "date": ["between", [fromdate, todate]]
-    }
-    if payroll_enrollment_id:
-        earning_sheet_filters["employee"] = payroll_enrollment_id
+            total_qty += row.get("insert_completed_qty") or 0
+            total_amount += row.get("amount") or 0
+            grouped_result.append(row)
 
-    sheets = frappe.get_all(
-        "Earning Sheet",
-        filters={**earning_sheet_filters, "docstatus": 1},
-        fields=["name", "employee", "employee_name", "date"]
-    )
-
-    for sheet in sheets:
-        key = sheet.employee
-        if key not in unified_map:
-            unified_map[key] = {
-                "info": {
-                    "payroll_enrollment_id": key,
-                    "operator_name": sheet.employee_name,
-                    "name": sheet.employee_name,
-                    "operator_id": key,
-                },
-                "rows": [],
-                "total_pass_count": 0,
-                "total_earning": 0,
-                "total_rate": 0
-            }
-
-        child_rows = frappe.get_all(
-            "Earning Sheet Type",
-            filters={"parent": sheet.name},
-            fields=["operation", "total_pass_count", "amount", "rate"]
-        )
-
-        for child in child_rows:
-            row = {
-                "operator_id": key,
-                "payroll_enrollment_id": key,
-                "operator_name": sheet.employee_name,
-                "name": sheet.employee_name,
-                "style_name": "-",
-                "style_id": "-",
-                "date": sheet.date,
-                "operation": child.operation,
-                "total_pass_count": child.total_pass_count,
-                "earning": child.amount,
-                "rate": child.rate
-            }
-            unified_map[key]["rows"].append(row)
-            unified_map[key]["total_pass_count"] += child.total_pass_count or 0
-            unified_map[key]["total_earning"] += child.amount or 0
-            unified_map[key]["total_rate"] += child.rate or 0
-
-    # Prepare final data
-    data_rows = []
-    for key, emp in unified_map.items():
-        data_rows.extend(emp["rows"])
-        if group_by_employee:
-            data_rows.append({
-                "operator_id": f"<b>{emp['info']['operator_id']}</b>",
-                "payroll_enrollment_id": f"<b>{emp['info']['payroll_enrollment_id']}</b>",
-                "operator_name": f"<b>{emp['info']['operator_name']}</b>",
-                "name": f"<b>{emp['info']['name']}</b>",
-                "style_name": "<b>TOTAL</b>",
-                "style_id": "-",
-                "date": "-",
-                "operation": "<b>TOTAL</b>",
-                "total_pass_count": emp["total_pass_count"],
-                "earning": emp["total_earning"],
-                "rate": emp["total_rate"],
+        # Final employee total
+        if current_employee:
+            grouped_result.append({
+                "job_card_reference": None,
+                "employee": current_employee,
+                "employee_name": f"{current_employee_name}",
+                "department": None,
+                "posting_date": None,
+                "wo_count_id": None,
+                "production_plan": None,
+                "production_item": None,
+                "operation": "<b>Total</b>",
+                "insert_completed_qty": total_qty,
+                "operation_rate": None,
+                "amount": total_amount
             })
 
-    return columns, data_rows
+        return columns, grouped_result
+
+    return columns, all_data
