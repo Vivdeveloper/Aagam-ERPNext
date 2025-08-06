@@ -147,3 +147,4 @@ def execute(filters=None):
         return columns, grouped_result
 
     return columns, result
+
