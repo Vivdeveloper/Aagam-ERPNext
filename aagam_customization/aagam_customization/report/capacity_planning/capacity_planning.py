@@ -161,6 +161,7 @@ def make_chart(rows):
     return chart
 
 
+
 def make_summary(rows):
     total_planned = sum(float(r.get("planned_qty") or 0) for r in rows)
     total_actual = sum(float(r.get("actual_qty") or 0) for r in rows)
